@@ -3,6 +3,7 @@ const TIME_STEP: f32 = 1.0 / 60.0;
 
 const JUMP_INITIAL_VELOCITY: f32 = 5.0;
 const GRAVITY: f32 = 5.0;
+const SCROLL_VELOCITY: f32 = 1.0;
 
 fn main() {
     App::new()
@@ -111,7 +112,7 @@ fn player_movement_system(
 ) {
     let (mut player, mut transform) = query.single_mut();
     // x direction
-    let mut direction_x = 0.0;
+    let mut direction_x = SCROLL_VELOCITY;
     if keyboard_input.pressed(KeyCode::Left) {
         direction_x -= 1.0;
     }
@@ -160,7 +161,7 @@ fn camera_movement_system(
     mut query: Query<(&Camera, &mut Transform)>,
 ) {
     let (_camera, mut transform) = query.single_mut();
-    let mut direction = 0.0;
+    let mut direction = SCROLL_VELOCITY;
     if keyboard_input.pressed(KeyCode::Left) {
         direction -= 1.0;
     }
