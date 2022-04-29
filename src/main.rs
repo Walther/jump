@@ -1,19 +1,28 @@
+use bevy::diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin};
 use bevy::{core::FixedTimestep, prelude::*};
+
+/// Lockstep for the game engine
 const TIME_STEP: f32 = 1.0 / 60.0;
 
 const JUMP_INITIAL_VELOCITY: f32 = 5.0;
 const GRAVITY: f32 = 5.0;
 const SCROLL_VELOCITY: f32 = 1.0;
 
+/// Fake unit for font-related calculations for visual consistency
+const REM: f32 = 24.0;
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
+        .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_startup_system(setup)
         .add_system_set(
             SystemSet::new()
                 .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
                 .with_system(player_movement_system)
-                .with_system(camera_movement_system),
+                .with_system(camera_movement_system)
+                .with_system(fps_text_update_system)
+                .with_system(score_text_update_system),
         )
         .run();
 }
@@ -23,6 +32,7 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
 ) {
     // spheres to jump over
     let y = 0;
@@ -84,6 +94,87 @@ fn setup(
             ..OrthographicCameraBundle::new_3d()
         })
         .insert(Camera);
+
+    // UI camera
+    commands.spawn_bundle(UiCameraBundle::default());
+    // FPS counter
+    commands
+        .spawn_bundle(TextBundle {
+            style: Style {
+                align_self: AlignSelf::FlexEnd,
+                position_type: PositionType::Absolute,
+                position: Rect {
+                    top: Val::Px(0.5 * REM),
+                    left: Val::Px(0.5 * REM),
+                    ..default()
+                },
+                ..default()
+            },
+            // Use `Text` directly
+            text: Text {
+                // Construct a `Vec` of `TextSection`s
+                sections: vec![
+                    TextSection {
+                        value: "FPS: ".to_string(),
+                        style: TextStyle {
+                            font: asset_server.load("fonts/undefined-medium.ttf"),
+                            font_size: REM,
+                            color: Color::WHITE,
+                        },
+                    },
+                    TextSection {
+                        value: "".to_string(),
+                        style: TextStyle {
+                            font: asset_server.load("fonts/undefined-medium.ttf"),
+                            font_size: REM,
+                            color: Color::WHITE,
+                        },
+                    },
+                ],
+                ..default()
+            },
+            ..default()
+        })
+        .insert(FpsText);
+    // Score counter
+    commands
+        .spawn_bundle(TextBundle {
+            style: Style {
+                align_self: AlignSelf::FlexEnd,
+                position_type: PositionType::Absolute,
+                position: Rect {
+                    top: Val::Px(0.5 * REM),
+                    right: Val::Px(0.5 * REM),
+                    ..default()
+                },
+                ..default()
+            },
+            // Use `Text` directly
+            text: Text {
+                // Construct a `Vec` of `TextSection`s
+                sections: vec![
+                    TextSection {
+                        value: "Score: ".to_string(),
+                        style: TextStyle {
+                            font: asset_server.load("fonts/undefined-medium.ttf"),
+                            font_size: REM,
+                            color: Color::WHITE,
+                        },
+                    },
+                    TextSection {
+                        value: "".to_string(),
+                        style: TextStyle {
+                            font: asset_server.load("fonts/undefined-medium.ttf"),
+                            font_size: REM,
+                            color: Color::WHITE,
+                        },
+                    },
+                ],
+                ..default()
+            },
+            ..default()
+        })
+        .insert(ScoreText);
 }
 
 #[derive(Component)]
@@ -105,6 +196,14 @@ enum JumpState {
     OnFloor,
     InAir,
 }
+
+// A unit struct to help identify the FPS UI component, since there may be many Text components
+#[derive(Component)]
+struct FpsText;
+
+// A unit struct to help identify the Score UI component, since there may be many Text components
+#[derive(Component)]
+struct ScoreText;
 
 fn player_movement_system(
     keyboard_input: Res<Input<KeyCode>>,
@@ -172,4 +271,26 @@ fn camera_movement_system(
 
     let translation = &mut transform.translation;
     translation.x += direction * TIME_STEP;
+}
+
+fn fps_text_update_system(
+    diagnostics: Res<Diagnostics>,
+    mut query: Query<&mut Text, With<FpsText>>,
+) {
+    let mut fpstext = query.single_mut();
+    if let Some(fps) = diagnostics.get(FrameTimeDiagnosticsPlugin::FPS) {
+        if let Some(average) = fps.average() {
+            // Update the value of the second section
+            fpstext.sections[1].value = format!("{:.2}", average);
+        }
+    }
+}
+
+fn score_text_update_system(
+    mut query: Query<&mut Text, With<ScoreText>>,
+    mut playertransform_query: Query<(&Player, &Transform)>,
+) {
+    let (_player, transform) = playertransform_query.single_mut();
+    let mut scoretext = query.single_mut();
+    scoretext.sections[1].value = format!("{:.2}", transform.translation.x);
 }
