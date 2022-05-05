@@ -4,6 +4,7 @@ use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::prelude::*;
 
 mod game;
+mod level;
 mod menu;
 
 // Enum that will be used as a global state for the game
