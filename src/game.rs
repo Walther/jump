@@ -1,6 +1,8 @@
 use bevy::diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin};
 use bevy::{core::FixedTimestep, prelude::*};
 
+use crate::level::Level;
+
 use super::{despawn_screen, GameState};
 
 /// Lockstep for the game engine
@@ -12,15 +14,18 @@ const JUMP_INITIAL_VELOCITY: f32 = 5.0;
 const GRAVITY: f32 = 5.0;
 
 /// Default movement speed in the autoscroller
-const SCROLL_VELOCITY: f32 = 1.0;
+const SCROLL_VELOCITY: f32 = 2.0;
 /// Boost velocity when the boost button is pressed
-const BOOST_VELOCITY: f32 = 2.0;
+const BOOST_VELOCITY: f32 = 5.0;
 
 /// Radius of the spheres, both for player and obstacles
 const SPHERE_RADIUS: f32 = 0.5;
 
 /// Fake unit for font-related calculations for visual consistency
 const REM: f32 = 24.0;
+
+/// Initial fixed testing seed, will use a dynamic one later on
+const FIXED_RNG_SEED: u64 = 0x1234_5678;
 
 pub struct GamePlugin;
 
@@ -55,30 +60,85 @@ fn game_setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
 ) {
-    // spheres to jump over. TODO: procedural generation
-    let y = 0;
-    for x in 0..=5 {
-        let x01 = (x) as f32 / 10.0;
-        let y01 = (y) as f32 / 4.0;
+    // TODO: load a seed given by the user in the Load game menu
+    let level = Level::new(FIXED_RNG_SEED);
+
+    // spheres to jump over
+    for obstacle in level.obstacles {
         commands
             .spawn_bundle(PbrBundle {
                 mesh: meshes.add(Mesh::from(shape::Icosphere {
                     radius: SPHERE_RADIUS,
                     subdivisions: 32,
                 })),
-                material: materials.add(StandardMaterial {
-                    base_color: Color::hex("777777").unwrap(),
-                    // vary key PBR parameters on a grid of spheres to show the effect
-                    metallic: y01,
-                    perceptual_roughness: x01,
-                    ..Default::default()
-                }),
-                transform: Transform::from_xyz(x as f32 * 3.0, y as f32, 0.0),
+                material: materials.add(obstacle.material),
+                transform: Transform::from_xyz(obstacle.x, obstacle.y, 0.0),
                 ..Default::default()
             })
             .insert(Obstacle)
             .insert(Collider);
     }
+
+    // lights
+    for (x, y) in level.lights {
+        commands.spawn_bundle(PointLightBundle {
+            transform: Transform::from_translation(Vec3::new(x, y, 10.0)),
+            point_light: PointLight {
+                intensity: 10_000.,
+                range: 15.,
+                shadows_enabled: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+    }
+
+    // background objects
+    for bg_object in level.bg_objects {
+        commands.spawn_bundle(PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
+            material: materials.add(bg_object.material),
+            transform: Transform::from_xyz(bg_object.x, bg_object.y, bg_object.z),
+            ..Default::default()
+        });
+    }
+
+    // background wall
+    commands.spawn_bundle(PbrBundle {
+        mesh: meshes.add(Mesh::from(shape::Quad {
+            size: (1000.0, 1000.0).into(),
+            flip: false,
+        })),
+        material: materials.add(StandardMaterial {
+            base_color: Color::hex("444444").unwrap(),
+            metallic: 0.5,
+            perceptual_roughness: 1.0,
+            ..Default::default()
+        }),
+        transform: Transform::from_xyz(0.0, 0.0, -5.0),
+        ..Default::default()
+    });
+
+    // floor
+    commands.spawn_bundle(PbrBundle {
+        mesh: meshes.add(Mesh::from(shape::Box {
+            min_x: -1_000.0,
+            max_x: 1_000.0,
+            min_y: -10.0,
+            max_y: -0.5,
+            min_z: -5.0,
+            max_z: 5.0,
+        })),
+        material: materials.add(StandardMaterial {
+            base_color: Color::hex("272822").unwrap(),
+            metallic: 0.5,
+            perceptual_roughness: 0.5,
+            ..Default::default()
+        }),
+        transform: Transform::from_xyz(0.0, 0.0, -5.0),
+        ..Default::default()
+    });
+
     // player
     commands
         .spawn_bundle(PbrBundle {
@@ -87,39 +147,27 @@ fn game_setup(
                 subdivisions: 32,
             })),
             material: materials.add(StandardMaterial {
-                base_color: Color::hex("ff8d0c").unwrap(),
-                metallic: 0.5,
-                perceptual_roughness: 0.5,
+                base_color: Color::WHITE,
+                perceptual_roughness: 0.01,
+                metallic: 0.8,
+                reflectance: 1.0,
                 ..Default::default()
             }),
             transform: Transform::from_xyz(-5.0, 0.0, 0.0),
             ..Default::default()
         })
         .insert(Player::default());
-    // light
-    commands.spawn_bundle(PointLightBundle {
-        transform: Transform::from_translation(Vec3::new(50.0, 50.0, 50.0)),
-        point_light: PointLight {
-            intensity: 600000.,
-            range: 100.,
-            ..Default::default()
-        },
-        ..Default::default()
-    });
+
     // camera
     commands
-        .spawn_bundle(OrthographicCameraBundle {
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 8.0))
+        .spawn_bundle(PerspectiveCameraBundle {
+            transform: Transform::from_xyz(0.0, 0.0, 8.0)
                 .looking_at(Vec3::new(0.0, 2.5, 0.0), Vec3::Y),
-            orthographic_projection: OrthographicProjection {
-                scale: 0.01,
-                ..Default::default()
-            },
-            ..OrthographicCameraBundle::new_3d()
+            ..default()
         })
         .insert(Camera::default());
 
-    // FPS counter
+    // fps counter
     commands
         .spawn_bundle(TextBundle {
             style: Style {
@@ -132,9 +180,7 @@ fn game_setup(
                 },
                 ..default()
             },
-            // Use `Text` directly
             text: Text {
-                // Construct a `Vec` of `TextSection`s
                 sections: vec![
                     TextSection {
                         value: "FPS: ".to_string(),
@@ -158,7 +204,8 @@ fn game_setup(
             ..default()
         })
         .insert(FpsText);
-    // Score counter
+
+    // score counter
     commands
         .spawn_bundle(TextBundle {
             style: Style {
@@ -171,9 +218,7 @@ fn game_setup(
                 },
                 ..default()
             },
-            // Use `Text` directly
             text: Text {
-                // Construct a `Vec` of `TextSection`s
                 sections: vec![
                     TextSection {
                         value: "Score: ".to_string(),
@@ -197,6 +242,32 @@ fn game_setup(
             ..default()
         })
         .insert(ScoreText);
+
+    // seed
+    commands.spawn_bundle(TextBundle {
+        style: Style {
+            align_self: AlignSelf::Center,
+            position_type: PositionType::Absolute,
+            position: Rect {
+                bottom: Val::Px(0.0),
+                left: Val::Px(0.5 * REM),
+                ..default()
+            },
+            ..default()
+        },
+        text: Text {
+            sections: vec![TextSection {
+                value: format!("Seed: {:#x}", FIXED_RNG_SEED),
+                style: TextStyle {
+                    font: asset_server.load("fonts/undefined-medium.ttf"),
+                    font_size: REM,
+                    color: Color::WHITE,
+                },
+            }],
+            ..default()
+        },
+        ..default()
+    });
 }
 
 #[derive(Component)]

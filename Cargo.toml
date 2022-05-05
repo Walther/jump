@@ -8,3 +8,5 @@ publish = false
 
 [dependencies]
 bevy = { version = "0.7.0", features = ["dynamic"] }
+rand = "0.8.5"
+rand_chacha = "0.3.1"
