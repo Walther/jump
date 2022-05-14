@@ -12,8 +12,7 @@ mod menu;
 enum GameState {
     MainMenu,
     Game,
-    // PauseMenu,
-    // GameOverMenu,
+    GameOverMenu,
 }
 
 fn main() {

@@ -2,6 +2,7 @@ use bevy::diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin};
 use bevy::{core::FixedTimestep, prelude::*};
 
 use crate::level::Level;
+use crate::menu::MenuState;
 
 use super::{despawn_screen, GameState};
 
@@ -44,7 +45,8 @@ impl Plugin for GamePlugin {
             )
             .add_event::<CollisionEvent>()
             .add_system_set(
-                SystemSet::on_exit(GameState::Game).with_system(despawn_screen::<OnGameScreen>),
+                SystemSet::on_exit(GameState::GameOverMenu)
+                    .with_system(despawn_screen::<OnGameScreen>),
             );
     }
 }
@@ -75,69 +77,78 @@ fn game_setup(
                 transform: Transform::from_xyz(obstacle.x, obstacle.y, 0.0),
                 ..Default::default()
             })
+            .insert(OnGameScreen)
             .insert(Obstacle)
             .insert(Collider);
     }
 
     // lights
     for (x, y) in level.lights {
-        commands.spawn_bundle(PointLightBundle {
-            transform: Transform::from_translation(Vec3::new(x, y, 10.0)),
-            point_light: PointLight {
-                intensity: 10_000.,
-                range: 15.,
-                shadows_enabled: true,
+        commands
+            .spawn_bundle(PointLightBundle {
+                transform: Transform::from_translation(Vec3::new(x, y, 10.0)),
+                point_light: PointLight {
+                    intensity: 10_000.,
+                    range: 15.,
+                    shadows_enabled: true,
+                    ..Default::default()
+                },
                 ..Default::default()
-            },
-            ..Default::default()
-        });
+            })
+            .insert(OnGameScreen);
     }
 
     // background objects
     for bg_object in level.bg_objects {
-        commands.spawn_bundle(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-            material: materials.add(bg_object.material),
-            transform: Transform::from_xyz(bg_object.x, bg_object.y, bg_object.z),
-            ..Default::default()
-        });
+        commands
+            .spawn_bundle(PbrBundle {
+                mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
+                material: materials.add(bg_object.material),
+                transform: Transform::from_xyz(bg_object.x, bg_object.y, bg_object.z),
+                ..Default::default()
+            })
+            .insert(OnGameScreen);
     }
 
     // background wall
-    commands.spawn_bundle(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Quad {
-            size: (1000.0, 1000.0).into(),
-            flip: false,
-        })),
-        material: materials.add(StandardMaterial {
-            base_color: Color::hex("444444").unwrap(),
-            metallic: 0.5,
-            perceptual_roughness: 1.0,
+    commands
+        .spawn_bundle(PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Quad {
+                size: (1000.0, 1000.0).into(),
+                flip: false,
+            })),
+            material: materials.add(StandardMaterial {
+                base_color: Color::hex("444444").unwrap(),
+                metallic: 0.5,
+                perceptual_roughness: 1.0,
+                ..Default::default()
+            }),
+            transform: Transform::from_xyz(0.0, 0.0, -5.0),
             ..Default::default()
-        }),
-        transform: Transform::from_xyz(0.0, 0.0, -5.0),
-        ..Default::default()
-    });
+        })
+        .insert(OnGameScreen);
 
     // floor
-    commands.spawn_bundle(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Box {
-            min_x: -1_000.0,
-            max_x: 1_000.0,
-            min_y: -10.0,
-            max_y: -0.5,
-            min_z: -5.0,
-            max_z: 5.0,
-        })),
-        material: materials.add(StandardMaterial {
-            base_color: Color::hex("272822").unwrap(),
-            metallic: 0.5,
-            perceptual_roughness: 0.5,
+    commands
+        .spawn_bundle(PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Box {
+                min_x: -1_000.0,
+                max_x: 1_000.0,
+                min_y: -10.0,
+                max_y: -0.5,
+                min_z: -5.0,
+                max_z: 5.0,
+            })),
+            material: materials.add(StandardMaterial {
+                base_color: Color::hex("272822").unwrap(),
+                metallic: 0.5,
+                perceptual_roughness: 0.5,
+                ..Default::default()
+            }),
+            transform: Transform::from_xyz(0.0, 0.0, -5.0),
             ..Default::default()
-        }),
-        transform: Transform::from_xyz(0.0, 0.0, -5.0),
-        ..Default::default()
-    });
+        })
+        .insert(OnGameScreen);
 
     // player
     commands
@@ -156,6 +167,7 @@ fn game_setup(
             transform: Transform::from_xyz(-5.0, 0.0, 0.0),
             ..Default::default()
         })
+        .insert(OnGameScreen)
         .insert(Player::default());
 
     // camera
@@ -165,6 +177,7 @@ fn game_setup(
                 .looking_at(Vec3::new(0.0, 2.5, 0.0), Vec3::Y),
             ..default()
         })
+        .insert(OnGameScreen)
         .insert(Camera::default());
 
     // fps counter
@@ -203,6 +216,7 @@ fn game_setup(
             },
             ..default()
         })
+        .insert(OnGameScreen)
         .insert(FpsText);
 
     // score counter
@@ -241,33 +255,36 @@ fn game_setup(
             },
             ..default()
         })
+        .insert(OnGameScreen)
         .insert(ScoreText);
 
     // seed
-    commands.spawn_bundle(TextBundle {
-        style: Style {
-            align_self: AlignSelf::Center,
-            position_type: PositionType::Absolute,
-            position: Rect {
-                bottom: Val::Px(0.0),
-                left: Val::Px(0.5 * REM),
+    commands
+        .spawn_bundle(TextBundle {
+            style: Style {
+                align_self: AlignSelf::Center,
+                position_type: PositionType::Absolute,
+                position: Rect {
+                    bottom: Val::Px(0.0),
+                    left: Val::Px(0.5 * REM),
+                    ..default()
+                },
+                ..default()
+            },
+            text: Text {
+                sections: vec![TextSection {
+                    value: format!("Seed: {:#x}", FIXED_RNG_SEED),
+                    style: TextStyle {
+                        font: asset_server.load("fonts/undefined-medium.ttf"),
+                        font_size: REM,
+                        color: Color::WHITE,
+                    },
+                }],
                 ..default()
             },
             ..default()
-        },
-        text: Text {
-            sections: vec![TextSection {
-                value: format!("Seed: {:#x}", FIXED_RNG_SEED),
-                style: TextStyle {
-                    font: asset_server.load("fonts/undefined-medium.ttf"),
-                    font_size: REM,
-                    color: Color::WHITE,
-                },
-            }],
-            ..default()
-        },
-        ..default()
-    });
+        })
+        .insert(OnGameScreen);
 }
 
 #[derive(Component)]
@@ -440,7 +457,16 @@ fn check_for_collisions(
     collider_query: Query<(Entity, &Transform, Option<&Obstacle>), With<Collider>>,
     mut collision_events: EventWriter<CollisionEvent>,
     mut camera_query: Query<&mut Camera>,
+    mut menu_state: ResMut<State<MenuState>>,
+    mut game_state: ResMut<State<GameState>>,
 ) {
+    // are we in game over or in a menu? early return
+    match &game_state.current() {
+        GameState::GameOverMenu => return,
+        GameState::MainMenu => return,
+        _ => {}
+    }
+
     // fallibility check needed as entities don't exist yet in menus
     let (mut player, player_trans) = match player_query.get_single_mut() {
         Ok(val) => val,
@@ -459,6 +485,10 @@ fn check_for_collisions(
             collision_events.send_default();
             player.collided = true;
             camera.stopped = true;
+
+            game_state.set(GameState::GameOverMenu).unwrap();
+            menu_state.set(MenuState::GameOver).unwrap();
+            break;
         }
     }
 }

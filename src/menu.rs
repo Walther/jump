@@ -6,6 +6,7 @@ pub struct MainMenuPlugin;
 const HEADING_REM: f32 = 80.0;
 const BUTTON_WIDTH: f32 = 250.0;
 const BUTTON_HEIGHT: f32 = 65.0;
+const TEXT_MARGIN: f32 = 0.5 * HEADING_REM;
 
 const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
 const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
@@ -39,9 +40,22 @@ impl Plugin for MainMenuPlugin {
             .add_system_set(
                 SystemSet::on_exit(MenuState::Help).with_system(despawn_screen::<OnHelpMenuScreen>),
             )
+            // Systems to handle the game over screen
+            .add_system_set(
+                SystemSet::on_enter(MenuState::GameOver).with_system(game_over_menu_setup),
+            )
+            .add_system_set(
+                SystemSet::on_exit(MenuState::GameOver)
+                    .with_system(despawn_screen::<OnGameOverMenuScreen>),
+            )
             // Common systems to all screens that handles buttons behaviour
             .add_system_set(
                 SystemSet::on_update(GameState::MainMenu)
+                    .with_system(menu_action)
+                    .with_system(button_system),
+            )
+            .add_system_set(
+                SystemSet::on_update(GameState::GameOverMenu)
                     .with_system(menu_action)
                     .with_system(button_system),
             );
@@ -50,10 +64,11 @@ impl Plugin for MainMenuPlugin {
 
 // State used for the current menu screen
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
-enum MenuState {
+pub(crate) enum MenuState {
     MainMenu,
     Help,
     LoadMenu,
+    GameOver,
     Disabled,
 }
 
@@ -64,6 +79,10 @@ struct OnMainMenuScreen;
 // Tag component used to tag entities added on the help menu screen
 #[derive(Component)]
 struct OnHelpMenuScreen;
+
+// Tag component used to tag entities added on the game over menu screen
+#[derive(Component)]
+struct OnGameOverMenuScreen;
 
 // Tag component used to tag entities added on the load game menu screen
 #[derive(Component)]
@@ -81,6 +100,7 @@ enum MenuButtonAction {
     LoadMenu,
     BackToMainMenu,
     Quit,
+    Thanks,
 }
 
 // This system handles changing all buttons color based on mouse interaction
@@ -138,7 +158,7 @@ fn main_menu_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             // Display the game name
             parent.spawn_bundle(TextBundle {
                 style: Style {
-                    margin: Rect::all(Val::Px(0.5 * HEADING_REM)),
+                    margin: Rect::all(Val::Px(TEXT_MARGIN)),
                     ..default()
                 },
                 text: Text::with_section(
@@ -231,7 +251,7 @@ fn main_menu_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 fn help_menu_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let button_style = Style {
-        size: Size::new(Val::Px(200.0), Val::Px(65.0)),
+        size: Size::new(Val::Px(BUTTON_WIDTH), Val::Px(BUTTON_HEIGHT)),
         margin: Rect::all(Val::Px(20.0)),
         justify_content: JustifyContent::Center,
         align_items: AlignItems::Center,
@@ -251,14 +271,18 @@ fn help_menu_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                 align_items: AlignItems::Center,
                 ..default()
             },
-            color: Color::CRIMSON.into(),
+            color: Color::ORANGE.into(),
             ..default()
         })
         .insert(OnHelpMenuScreen)
         .with_children(|parent| {
             parent.spawn_bundle(TextBundle {
+                style: Style {
+                    margin: Rect::all(Val::Px(TEXT_MARGIN)),
+                    ..default()
+                },
                 text: Text::with_section(
-                    "Unimplemented",
+                    "Spacebar to jump\nRight arrow to boost",
                     button_text_style.clone(),
                     Default::default(),
                 ),
@@ -283,7 +307,7 @@ fn help_menu_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 fn load_game_menu_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let button_style = Style {
-        size: Size::new(Val::Px(200.0), Val::Px(65.0)),
+        size: Size::new(Val::Px(BUTTON_WIDTH), Val::Px(BUTTON_HEIGHT)),
         margin: Rect::all(Val::Px(20.0)),
         justify_content: JustifyContent::Center,
         align_items: AlignItems::Center,
@@ -303,12 +327,16 @@ fn load_game_menu_setup(mut commands: Commands, asset_server: Res<AssetServer>) 
                 align_items: AlignItems::Center,
                 ..default()
             },
-            color: Color::CRIMSON.into(),
+            color: Color::ORANGE.into(),
             ..default()
         })
         .insert(OnLoadGameScreen)
         .with_children(|parent| {
             parent.spawn_bundle(TextBundle {
+                style: Style {
+                    margin: Rect::all(Val::Px(TEXT_MARGIN)),
+                    ..default()
+                },
                 text: Text::with_section(
                     "Unimplemented",
                     button_text_style.clone(),
@@ -327,6 +355,66 @@ fn load_game_menu_setup(mut commands: Commands, asset_server: Res<AssetServer>) 
                 .with_children(|parent| {
                     parent.spawn_bundle(TextBundle {
                         text: Text::with_section("Back", button_text_style, Default::default()),
+                        ..default()
+                    });
+                });
+        });
+}
+
+fn game_over_menu_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let button_style = Style {
+        size: Size::new(Val::Px(BUTTON_WIDTH), Val::Px(BUTTON_HEIGHT)),
+        margin: Rect::all(Val::Px(20.0)),
+        justify_content: JustifyContent::Center,
+        align_items: AlignItems::Center,
+        ..default()
+    };
+    let button_text_style = TextStyle {
+        font: asset_server.load("fonts/undefined-medium.ttf"),
+        font_size: 40.0,
+        color: Color::WHITE,
+    };
+
+    commands
+        .spawn_bundle(NodeBundle {
+            style: Style {
+                margin: Rect::all(Val::Auto),
+                flex_direction: FlexDirection::ColumnReverse,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            color: Color::ORANGE.into(),
+            ..default()
+        })
+        .insert(OnGameOverMenuScreen)
+        .with_children(|parent| {
+            parent.spawn_bundle(TextBundle {
+                style: Style {
+                    margin: Rect::all(Val::Px(TEXT_MARGIN)),
+                    ..default()
+                },
+                text: Text::with_section(
+                    "Game over!",
+                    button_text_style.clone(),
+                    Default::default(),
+                ),
+                ..default()
+            });
+            // Display the back button to return to the main menu screen
+            parent
+                .spawn_bundle(ButtonBundle {
+                    style: button_style,
+                    color: NORMAL_BUTTON.into(),
+                    ..default()
+                })
+                .insert(MenuButtonAction::Thanks)
+                .with_children(|parent| {
+                    parent.spawn_bundle(TextBundle {
+                        text: Text::with_section(
+                            "Thanks <3",
+                            button_text_style,
+                            Default::default(),
+                        ),
                         ..default()
                     });
                 });
@@ -353,6 +441,10 @@ fn menu_action(
                 MenuButtonAction::LoadMenu => menu_state.set(MenuState::LoadMenu).unwrap(),
                 MenuButtonAction::Help => menu_state.set(MenuState::Help).unwrap(),
                 MenuButtonAction::BackToMainMenu => menu_state.set(MenuState::MainMenu).unwrap(),
+                MenuButtonAction::Thanks => {
+                    game_state.set(GameState::MainMenu).unwrap();
+                    menu_state.set(MenuState::MainMenu).unwrap();
+                }
             }
         }
     }
