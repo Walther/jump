@@ -3,6 +3,8 @@
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::prelude::*;
 
+use rand::prelude::*;
+
 mod game;
 mod level;
 mod menu;
@@ -15,12 +17,22 @@ enum GameState {
     GameOverMenu,
 }
 
+// The seed used for the level generation
+#[derive(Clone, Eq, PartialEq, Debug, Hash)]
+struct SeedState {
+    pub value: u64,
+}
+
 fn main() {
+    let mut rng = ThreadRng::default();
+    let seed: u64 = rng.gen();
+
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_startup_system(setup)
         .add_state(GameState::MainMenu)
+        .add_state(SeedState { value: seed })
         .add_plugin(menu::MainMenuPlugin)
         .add_plugin(game::GamePlugin)
         // .add_plugin(game::PauseMenuPlugin)

@@ -4,7 +4,7 @@ use bevy::{core::FixedTimestep, prelude::*};
 use crate::level::Level;
 use crate::menu::MenuState;
 
-use super::{despawn_screen, GameState};
+use super::{despawn_screen, GameState, SeedState};
 
 /// Lockstep for the game engine
 const TIME_STEP: f32 = 1.0 / 60.0;
@@ -24,9 +24,6 @@ const SPHERE_RADIUS: f32 = 0.5;
 
 /// Fake unit for font-related calculations for visual consistency
 const REM: f32 = 24.0;
-
-/// Initial fixed testing seed, will use a dynamic one later on
-const FIXED_RNG_SEED: u64 = 0x1234_5678;
 
 pub struct GamePlugin;
 
@@ -61,9 +58,10 @@ fn game_setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
+    seed_state: ResMut<State<SeedState>>,
 ) {
-    // TODO: load a seed given by the user in the Load game menu
-    let level = Level::new(FIXED_RNG_SEED);
+    let seed = seed_state.current().value;
+    let level = Level::new(seed);
 
     // spheres to jump over
     for obstacle in level.obstacles {
@@ -273,7 +271,7 @@ fn game_setup(
             },
             text: Text {
                 sections: vec![TextSection {
-                    value: format!("Seed: {:#x}", FIXED_RNG_SEED),
+                    value: format!("Seed: {:#x}", seed),
                     style: TextStyle {
                         font: asset_server.load("fonts/undefined-medium.ttf"),
                         font_size: REM,

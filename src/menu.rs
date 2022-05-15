@@ -1,6 +1,7 @@
-use super::{despawn_screen, GameState};
+use super::{despawn_screen, GameState, SeedState};
 use bevy::app::AppExit;
 use bevy::prelude::*;
+use rand::prelude::*;
 pub struct MainMenuPlugin;
 
 const HEADING_REM: f32 = 80.0;
@@ -12,6 +13,9 @@ const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
 const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
 const HOVERED_PRESSED_BUTTON: Color = Color::rgb(0.25, 0.65, 0.25);
 const PRESSED_BUTTON: Color = Color::rgb(0.35, 0.75, 0.35);
+
+/// Fixed testing seed, used in place of proper user-provided seed loading mechanism
+const FIXED_RNG_SEED: u64 = 0x1234_5678;
 
 impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut App) {
@@ -344,6 +348,23 @@ fn load_game_menu_setup(mut commands: Commands, asset_server: Res<AssetServer>) 
                 ),
                 ..default()
             });
+            parent.spawn_bundle(TextBundle {
+                style: Style {
+                    size: Size::new(Val::Px(400.0), Val::Auto),
+                    margin: Rect::all(Val::Px(TEXT_MARGIN)),
+                    ..default()
+                },
+                text: Text::with_section(
+                    "Proper seed loading has not been implemented yet. By visiting this menu, you have loaded the fixed seed 0x1234_5678",
+                    TextStyle {
+                        font: asset_server.load("fonts/undefined-medium.ttf"),
+                        font_size: 20.0,
+                        color: Color::WHITE,
+                    },
+                    Default::default(),
+                ),
+                ..default()
+            });
             // Display the back button to return to the main menu screen
             parent
                 .spawn_bundle(ButtonBundle {
@@ -429,6 +450,7 @@ fn menu_action(
     mut app_exit_events: EventWriter<AppExit>,
     mut menu_state: ResMut<State<MenuState>>,
     mut game_state: ResMut<State<GameState>>,
+    mut seed_state: ResMut<State<SeedState>>,
 ) {
     for (interaction, menu_button_action) in interaction_query.iter() {
         if *interaction == Interaction::Clicked {
@@ -438,12 +460,21 @@ fn menu_action(
                     game_state.set(GameState::Game).unwrap();
                     menu_state.set(MenuState::Disabled).unwrap();
                 }
-                MenuButtonAction::LoadMenu => menu_state.set(MenuState::LoadMenu).unwrap(),
+                MenuButtonAction::LoadMenu => {
+                    menu_state.set(MenuState::LoadMenu).unwrap();
+                    // ignore error from setting state again
+                    let _ = seed_state.set(SeedState {
+                        value: FIXED_RNG_SEED,
+                    });
+                }
                 MenuButtonAction::Help => menu_state.set(MenuState::Help).unwrap(),
                 MenuButtonAction::BackToMainMenu => menu_state.set(MenuState::MainMenu).unwrap(),
                 MenuButtonAction::Thanks => {
                     game_state.set(GameState::MainMenu).unwrap();
                     menu_state.set(MenuState::MainMenu).unwrap();
+                    let mut rng = ThreadRng::default();
+                    let seed: u64 = rng.gen();
+                    seed_state.set(SeedState { value: seed }).unwrap();
                 }
             }
         }
