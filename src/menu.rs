@@ -292,6 +292,23 @@ fn help_menu_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                 ),
                 ..default()
             });
+            parent.spawn_bundle(TextBundle {
+                style: Style {
+                    size: Size::new(Val::Px(400.0), Val::Auto),
+                    margin: Rect::all(Val::Px(TEXT_MARGIN)),
+                    ..default()
+                },
+                text: Text::with_section(
+                    "Jump over the obstacles and gain points based on the distance. Note that the score starts from negative as each level starts with a buffer area with no obstacles generated.",
+                    TextStyle {
+                        font: asset_server.load("fonts/undefined-medium.ttf"),
+                        font_size: 20.0,
+                        color: Color::WHITE,
+                    },
+                    Default::default(),
+                ),
+                ..default()
+            });
             // Display the back button to return to the main menu screen
             parent
                 .spawn_bundle(ButtonBundle {
